@@ -1,0 +1,2230 @@
+---
+title: "The Power of XAI - binary classification problem "
+author: "Marcin Chlebus, PhD (WNE UW, Data Juice Lab)"
+date: "16.05.2021"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+During the workshop my best practices in modelling business decison would be presented.
+
+Installing needed libraries
+
+
+```{r}
+# # wersja CRAN
+# install.packages("DALEX")
+# 
+# # wersja gtihub
+# source("https://install-github.me/ModelOriented/DALEX")
+# 
+# # instalacja pakietów potrzebnych do używania DALEX
+# DALEX::install_dependencies()
+# 
+# # pakiety z rodziny DALEX
+# install.packages('auditor')
+# install.packages("ingredients")
+# install.packages("iBreakDown")
+# 
+# #maniuplacja danych
+# install.packages("dplyr")
+# 
+# #API do pobierania danych z repozytorium Open ML
+# install.packages("farff")
+# install.packages("readr")
+# install.packages("OpenML")
+# 
+# 
+# 
+# #EDA
+# install.packages("DescTools")
+# 
+# #Modelowanie
+# install.packages("caret")
+# install.packages("randomForest")
+# install.packages("xgb")
+# install.packages("xgboost")
+# 
+# #rpart i dodatki
+# install.packages("rattle")
+# install.packages("rpart")
+# install.packages("rpart.plot")
+# 
+# #Analiza jakości modelu
+# install.packages("caTools")
+# install.packages("pROC")
+# install.packages("OptimalCutpoints")
+# 
+# # Interpretacja modelu
+# install.packages("lime")
+# install.packages("vip")
+# 
+# #pobranie z githuba rSAFE
+# 
+# install.packages("rlang")
+# install.packages("devtools")
+# library(devtools)
+# devtools::install_github("ModelOriented/rSAFE")
+```
+
+
+Uploading libraries and setting english
+
+```{r message=FALSE, warning=FALSE}
+
+  #setting language
+  Sys.setenv(LANG = "en") 
+
+  #api for Open ML DB repo and dependencies
+ 
+  library(OpenML)
+  library(farff)
+  library(readr)
+
+  #libraries for manipulating data and visualsation
+
+  library(dplyr)
+  library(ggplot2)
+  library(DescTools)
+
+  #performance measures for classification issues
+
+  library(caTools)
+  library(pROC)
+  library(OptimalCutpoints)
+
+  #library for modeling
+
+  library(caret)
+  library(rattle)
+  library(rpart.plot)
+  library(xgboost)
+
+  #XAI libraries
+
+  library(vip)
+  library(lime)
+  library(DALEX)
+  library(auditor)
+  library(ingredients)
+  library(iBreakDown)
+  library(rSAFE)
+
+ 
+  getwd()
+```
+
+###Use Case based on marketing data from a bank
+
+Data is coming from:
+
+S. Moro, R. Laureano and P. Cortez. Using Data Mining for Bank Direct Marketing: An Application of the CRISP-DM Methodology. In P. Novais et al. (Eds.), Proceedings of the European Simulation and Modelling Conference - ESM'2011, pp. 117-121, Guimaraes, Portugal, October, 2011. EUROSIS.
+
+Citation Request:
+  This dataset is publicly available for research. The details are described in [Moro et al., 2014]. 
+  Please include this citation if you plan to use this database:
+
+[Moro et al., 2014] S. Moro, P. Cortez and P. Rita. A Data-Driven Approach to Predict the Success of Bank Telemarketing. Decision Support Systems, In press, http://dx.doi.org/10.1016/j.dss.2014.03.001
+
+  Available at: [pdf] http://dx.doi.org/10.1016/j.dss.2014.03.001
+                [bib] http://www3.dsi.uminho.pt/pcortez/bib/2014-dss.txt
+
+###Data description
+
+The data is related to direct marketing campaigns of a Portuguese banking institution. 
+
+The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be (or not) subscribed.
+
+The classification goal is to predict if the client will subscribe a term deposit (variable y).
+
+Input variables:
+
+  Bank client data:
+  
+    Socjo-demo:
+  
+    1 - age (numeric)
+  
+   
+    3 - marital : marital status (categorical: "married",
+                                               "divorced",
+                                               "single",
+                                               "unknown"; note: "divorced" means divorced or widowed)
+    
+    4 - education (categorical: "basic.4y",
+                                "basic.6y",
+                                "basic.9y",
+                                "high.school",
+                                "illiterate",
+                                "professional.course",
+                                "university.degree",
+                                "unknown"")
+    Job:
+                                
+    2 - job : type of job (categorical: "admin.",
+          "unknown",
+          "unemployed",
+          "management",
+          "housemaid",
+          "entrepreneur",
+          "student",
+          "blue-collar",
+          "self-employed",
+          "retired",
+          "technician",
+          "services")
+
+     
+    Credit hitory:
+    
+     5 - default: has credit in default? (binary: "yes","no","unknown")
+    
+     6 - housing: has housing loan? (binary: "yes","no","unknown")
+    
+     7 - loan: has personal loan? (binary: "yes","no","unknown")
+
+  Related to contacts of the current campaign:
+
+    Actual Campaign
+  
+    8 - contact: contact communication type (categorical: "unknown",
+                                                          "telephone",
+                                                          "cellular")
+    
+    10 - day_of_week: last contact day of the month (numeric)
+    
+    9 - month: last contact month of year (categorical: "jan", "feb", "mar", ..., "nov", "dec")
+    
+    11 - duration: last contact duration, in seconds (numeric); Important note:  this attribute highly affects the output target (e.g., if duration=0 then y="no"). Yet, the duration is not known before a call is performed. Also, after the end of the call y is obviously known. Thus, this input should only be included for benchmark purposes and should be discarded if the intention is to have a realistic predictive model.
+    
+    12 - campaign: number of contacts performed during this campaign and for this client (numeric)
+
+
+    Previous Campaign
+    
+    13 - pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric, -1 not previously contacted)
+    
+    14 - previous: number of contacts performed before this campaign and for this client (numeric)
+    
+    15 - poutcome: outcome of the previous marketing campaign (categorical: "unknown",
+                                                                            "other",
+                                                                            "no",
+                                                                            "yes")
+Macroeconomic data
+
+    16 - emp.var.rate: employment variation rate - quarterly indicator (numeric)
+    17 - cons.price.idx: consumer price index - monthly indicator (numeric)     
+    18 - cons.conf.idx: consumer confidence index - monthly indicator (numeric)     
+    19 - euribor3m: euribor 3 month rate - daily indicator (numeric)
+    20 - nr.employed: number of employees - quarterly indicator (numeric)
+  
+Target Variable
+
+    21 - Class - has the client subscribed a term deposit? (binary: "yes","no")
+
+
+
+Constrained data without macroenomic variables imported from Open ML repository via R api
+```{r message=FALSE, warning=FALSE}
+mkgt_OpenML <- getOMLDataSet(data.id = 1461)
+mkgt <- mkgt_OpenML$data
+colnames(mkgt) <-c("age","job","marital","educ","def","balance","housing","loan","contact","day","month","duration","campaign", "pdays", "previous", "poutcome","class")
+mkgt %>% as_tibble()
+
+```
+
+Data is imported via csv file from UCI Machine Learnig Repository
+```{r message=FALSE, warning=FALSE}
+
+mkgt <- read.csv2("data/bank-additional-full.csv",sep=";",dec=".",stringsAsFactors = T)
+colnames(mkgt)[21]<-"class"
+
+mkgt <- mkgt %>% dplyr::select(-duration)
+str(mkgt)
+
+```
+
+EDA for all variables using Desc() form DescTools.
+
+Importat issues:
+
+    0. Type of variables
+    1. Missings
+    2. Outliers (Skewness/Kurtosis)
+    3. Large number of levels factors
+    4. Special values
+    5. Target variable (imbalnace?)
+
+
+```{r message=FALSE, warning=FALSE}
+options(scipen = 99)
+Desc(mkgt$age, plotit=T)
+Desc(mkgt$marital, plotit=T)
+Desc(mkgt$educ, plotit=T)
+
+Desc(mkgt$job, plotit=T)
+
+
+Desc(mkgt$def, plotit=T)
+Desc(mkgt$housing, plotit=T)
+Desc(mkgt$loan, plotit=T)
+
+Desc(mkgt$contact, plotit=T)
+Desc(mkgt$day, plotit=T)
+Desc(mkgt$month, plotit=T)
+Desc(mkgt$duration, plotit=T)
+Desc(mkgt$campaign, plotit=T)
+
+Desc(mkgt$pdays, plotit=T)
+Desc(mkgt$previous, plotit=T)
+Desc(mkgt$poutcome, plotit=T)
+
+
+Desc(mkgt$emp.var.rate, plotit=T)
+Desc(mkgt$cons.price.idx, plotit=T)
+Desc(mkgt$cons.conf.idx, plotit=T)
+Desc(mkgt$euribor3m, plotit=T)
+Desc(mkgt$nr.employed, plotit=T)
+
+Desc(mkgt$class, plotit=T)
+
+
+```
+
+### Splitting data into train and test sample. 
+
+Here without stratification. However, I ussually stratifies over target at least.
+
+```{r}
+set.seed(1916)
+sample <- sample.split(mkgt$class, SplitRatio=0.7)
+train <-mkgt[sample,]
+test <- mkgt[!sample,]
+
+nrow(mkgt)
+nrow(train)
+nrow(test)
+nrow(train)+nrow(test)
+```
+
+### Training Logistic Regression using Caret
+
+```{r}
+
+# preparing target for Caret if target variable is not Factor variable with names (not numbers)
+
+# train$class <- factor(ifelse(train$class==1,"no","yes"))
+# test$class <- factor(ifelse(test$class==1,"no","yes"))
+Desc(train$class)
+
+#train logistic regression
+# trControl=trainControl(summaryFunction=twoClassSummary, classProbs = TRUE,
+# method="cv", number=10)
+# 
+# 
+# LR <- train(class~
+#               job + 
+#               marital + 
+#               default + 
+#               housing + 
+#               contact + 
+#               month + 
+#               day_of_week + 
+#               campaign + 
+#               pdays + 
+#               poutcome + 
+#               emp.var.rate + 
+#               cons.price.idx + 
+#               cons.conf.idx + 
+#               euribor3m + 
+#               nr.employed
+#     , data=train, method='glm',
+# trControl=trControl, metric="ROC")
+# 
+# 
+# saveRDS(LR, file = "LR.rds")
+
+LR<-readRDS(file = "LR.rds")
+
+summary(LR)
+```
+
+Before assessment of a quality of the model Optimal Cut-Off should be find. Otherwise very often all measures using 0/1 prediction are not presenting real quality of the model (imbalance data)
+
+
+```{r message=FALSE, warning=FALSE}
+#prediction probability based on LR
+
+pred_LR<-predict(LR, test, "prob")[,2]
+test$pred_LR<-pred_LR
+
+#numeric verison of the target
+
+test$class1<-ifelse(test$class=="yes",1,0)
+
+
+
+#findig an optimal cut-off point 
+opt_LR_ROC01<-optimal.cutpoints(X = "pred_LR", 
+                                status = "class1", 
+                                tag.healthy = 1, 
+                                direction=">",
+                                methods = "ROC01", 
+                                data = test, 
+                                ci.fit = TRUE, 
+                                conf.level = 0.95, 
+                                trace = T)
+
+opt_LR_ROC01$ROC01$Global$optimal.cutoff$cutoff
+```
+LR model assessment
+
+```{r}
+start<-Sys.time()
+
+# Creating the explainers
+
+# in dataset only features should be included
+cols<-colnames(train)[-20]
+
+#prediction function
+p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+
+#target variable
+yTest<-ifelse(test$class=="yes",1,0)
+
+# Creating explainers for model - DALEX
+
+explainer_lr <- explain(LR,
+                        data = test[,cols],
+                        y =yTest,
+                        predict_function = p_fun,
+                        label = 'lr')
+
+stop<-Sys.time()
+
+stop-start
+```
+
+```{r}
+options(scipen=9999)
+
+#gini
+2*score_auc(explainer_lr)$score-1
+2*ci.auc(test$class,pred_LR)-1
+
+#confusion matrices for different cut-offs
+
+mean(test$class1)
+opt_LR_ROC01$ROC01$Global$optimal.cutoff$cutoff
+confusionMatrix(factor(ifelse(pred_LR>mean(test$class1),"yes","no")),test$class,positive ="yes")
+confusionMatrix(factor(ifelse(pred_LR>opt_LR_ROC01$ROC01$Global$optimal.cutoff$cutoff,"yes","no")), test$class, positive ="yes")
+confusionMatrix(factor(ifelse(pred_LR>0.5,"yes","no")),test$class,positive ="yes")
+
+
+```
+
+
+Stepwise
+
+
+```{r}
+library(MASS) 
+library(caret) 
+library(parallel) 
+library(foreach)
+library(doParallel)
+
+
+# start_time <- Sys.time()
+# set.seed(1916)
+# 
+# 
+# fitControl <- trainControl(method = "cv", number = 10, returnResamp="final",
+# 
+# ## Estimate class probabilities
+# classProbs = T,
+# ## Evaluate performance using #
+# ## the following function
+# summaryFunction = twoClassSummary,
+# savePredictions = T, search = "random" )
+# 
+# LR_stepwise <- train(class~.,data=train, method = 'glmStepAIC', trControl = fitControl, metric="ROC", tuneLength = 1,
+# direction="both", steps=30, k=50, trace=F)
+# 
+#   end_time <- Sys.time()
+#   lrst_time<-end_time - start_time
+#   lrst_time
+#   Time difference of 1.980565 hours
+# 
+# saveRDS(LR_stepwise, file = "LR_stepwise.rds")
+
+LR_stepwise<-readRDS(file = "LR_stepwise.rds")
+summary(LR_stepwise)
+
+
+```
+
+
+
+
+```{r}
+
+LR_stepwise$results %>% arrange(desc(ROC))
+
+```
+
+
+
+
+```{r}
+start<-Sys.time()
+
+# Creating the explainers
+
+# in dataset only features should be included
+cols<-colnames(train)[-20]
+
+#prediction function
+p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+
+#target variable
+yTest<-ifelse(test$class=="yes",1,0)
+
+# Creating explainers for model - DALEX
+
+explainer_LR_stepwise <- explain(LR_stepwise,
+                        data = test[,cols],
+                        y =yTest,
+                        predict_function = p_fun,
+                        label = 'lr_st')
+
+stop<-Sys.time()
+
+stop-start
+```
+
+```{r message=FALSE, warning=FALSE}
+#prediction probability based on LR
+
+pred_LR_stepwise<-predict(LR_stepwise, test, "prob")[,2]
+test$pred_LR_stepwise<-pred_LR_stepwise
+
+#numeric verison of the target
+
+test$class1<-ifelse(test$class=="yes",1,0)
+
+
+
+#findig an optimal cut-off point 
+opt_pred_LR_stepwise_ROC01<-optimal.cutpoints(X = "pred_LR_stepwise", 
+                                status = "class1", 
+                                tag.healthy = 1, 
+                                direction=">",
+                                methods = "SpEqualSe", 
+                                data = test, 
+                                ci.fit = TRUE, 
+                                conf.level = 0.95, 
+                                trace = T)
+
+opt_pred_LR_stepwise_ROC01
+```
+
+
+```{r}
+options(scipen=9999)
+
+#gini
+2*score_auc(explainer_LR_stepwise)$score-1
+2*ci.auc(test$class,pred_LR)-1
+
+#confusion matrices for different cut-offs
+
+mean(test$class1)
+confusionMatrix(factor(ifelse(pred_LR_stepwise>mean(test$class1),"yes","no")),test$class,positive ="yes")
+confusionMatrix(factor(ifelse(pred_LR_stepwise>opt_pred_LR_stepwise_ROC01$SpEqualSe$Global$optimal.cutoff$cutoff,"yes","no")), test$class, positive ="yes")
+confusionMatrix(factor(ifelse(pred_LR_stepwise>0.5,"yes","no")),test$class,positive ="yes")
+
+
+
+```
+
+We are starrting with ML methods
+1. Setting up a tune length parameter
+
+
+```{r}
+tuneL=5
+```
+
+
+Regularised LR - Elastic net 
+
+```{r}
+#   library(caret)
+#   library(parallel)
+#   library(foreach)
+#   library(doParallel)
+# 
+# 
+# start_time <- Sys.time()
+# no_cores <- detectCores() - 1
+# cl <- makePSOCKcluster(no_cores, outfile = "debug.txt")
+# registerDoParallel(cl)
+# 
+# 
+# fitControl <- trainControl(method = "cv",
+#                           number = 10,
+#                            returnResamp="final",
+#                            #    ## Estimate class probabilities
+#                            classProbs = T,
+#                            #    ## Evaluate performance using
+#                            #    ## the following function
+#                            summaryFunction = twoClassSummary,
+#                            savePredictions = T,
+# 
+#                            search = "random"
+#                            )
+# 
+# lr_reg <- train(class~.,data=train,
+#                 # preProc = c("center", "scale"),
+#                 method =  'glmnet',
+#                 family="binomial",
+#                 trControl = fitControl,
+#                 metric="ROC",
+#                 tuneLength = tuneL
+# )
+# 
+# stopCluster(cl)
+# registerDoSEQ()
+# end_time <- Sys.time()
+# lrr_time<-end_time - start_time
+# lrr_time
+# # Time difference of 22.13338 mins
+# saveRDS(lr_reg, file = "lr_reg.rds")
+
+lr_reg<-readRDS(file = "lr_reg.rds")
+summary(lr_reg)
+```
+
+Hyperparameters tunning results
+
+```{r}
+par(mfrow = c(2, 1))
+plot(lr_reg)
+ggplot(lr_reg, ask = FALSE)
+par(mfrow = c(1, 1))
+```
+
+Best Alpha & Lambda
+```{r}
+lr_reg$bestTune[[1]]
+lr_reg$finalModel$tuneValue[[2]]
+
+```
+All results
+```{r}
+lr_reg$results %>% arrange(desc(ROC))
+
+```
+Modelling the best model only - Elastic Net
+```{r}
+y <- train$class
+# creating a matrix with predictors
+X <- model.matrix(class ~ ., train)
+lr_reg_fm <- glmnet::glmnet(x = X, y = y, family = "binomial", alpha = lr_reg$bestTune[[1]], lambda = lr_reg$bestTune[[2]])
+```
+
+
+```{r}
+coeff_lr_reg_fm<-broom::tidy(lr_reg_fm)  %>% 
+  dplyr::select(term, estimate) %>% 
+  mutate_at("estimate", round, 4) 
+
+coeff_lr_reg_fm
+```
+
+```{r}
+start<-Sys.time()
+
+# Creating the explainers
+
+# in dataset only features should be included
+cols<-colnames(train)[-20]
+
+#prediction function
+p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+
+#target variable
+yTest<-ifelse(test$class=="yes",1,0)
+
+# Creating explainers for model - DALEX
+
+explainer_lr_reg <- explain(lr_reg,
+                        data = test[,cols],
+                        y =yTest,
+                        predict_function = p_fun,
+                        label = 'lr_reg')
+
+stop<-Sys.time()
+
+stop-start
+```
+
+```{r message=FALSE, warning=FALSE}
+#prediction probability based on LR
+
+pred_lr_reg<-predict(lr_reg, test, "prob")[,2]
+test$pred_lr_reg<-pred_lr_reg
+
+#numeric verison of the target
+
+test$class1<-ifelse(test$class=="yes",1,0)
+
+
+
+#findig an optimal cut-off point 
+opt_lr_reg_ROC01<-optimal.cutpoints(X = "pred_lr_reg", 
+                                status = "class1", 
+                                tag.healthy = 1, 
+                                direction=">",
+                                methods = "ROC01", 
+                                data = test, 
+                                ci.fit = TRUE, 
+                                conf.level = 0.95, 
+                                trace = T)
+
+opt_lr_reg_ROC01
+```
+
+
+```{r}
+options(scipen=9999)
+
+#gini
+2*score_auc(explainer_lr_reg)$score-1
+2*ci.auc(test$class,pred_lr_reg)-1
+
+#confusion matrices for different cut-offs
+
+mean(test$class1)
+confusionMatrix(factor(ifelse(pred_lr_reg>mean(test$class1),"yes","no")),test$class,positive ="yes")
+confusionMatrix(factor(ifelse(pred_lr_reg>opt_lr_reg_ROC01$ROC01$Global$optimal.cutoff$cutoff,"yes","no")), test$class, positive ="yes")
+confusionMatrix(factor(ifelse(pred_lr_reg>0.5,"yes","no")),test$class,positive ="yes")
+
+
+
+```
+
+
+
+
+
+Decsioon tree
+
+
+```{r}
+
+library(MASS)
+library(randomForest)
+library(caret)
+library(parallel)
+library(foreach)
+library(doParallel)
+
+
+
+no_cores <- detectCores() - 1
+cl <- makePSOCKcluster(no_cores, outfile = "debug.txt")
+registerDoParallel(cl)
+
+seeds <- vector(mode = "list", length = nrow(train) + 1)
+seeds <- lapply(seeds, function(x) 5:25)
+
+
+fitControl <- trainControl(method = "cv",
+                           number = 10,
+                           returnResamp="final",
+                           #    ## Estimate class probabilities
+                           classProbs = T,
+                           #    ## Evaluate performance using
+                           #    ## the following function
+                           summaryFunction = twoClassSummary,
+                           savePredictions = T,
+                           seeds=seeds,
+                           search = "random"
+                           )
+
+DT <- train(class~.,data=train,
+                method =  'rpart',
+                trControl = fitControl,
+                metric="ROC",
+                tuneLength = tuneL,
+                parms = list(split = 'information'),
+                maxdepth = 10,
+                minsplit = 50, # number of obs in a split
+                minbucket =  round(50/3)
+
+
+)
+
+stopCluster(cl)
+registerDoSEQ()
+
+saveRDS(DT, file = "DT.rds")
+
+DT<-readRDS(file = "DT.rds")
+```
+
+
+CP parameter
+```{r}
+par(mfrow = c(2, 1))
+plot(DT)
+ggplot(DT, ask = FALSE, which = 1)
+par(mfrow = c(1, 1))
+```
+
+Results for all
+```{r}
+DT$results %>% arrange(desc(ROC))
+```
+
+Importance
+```{r}
+DT$finalModel$variable.importance
+```
+
+Tree plot
+```{r}
+prp(DT$finalModel, extra = 6,
+box.col = c("orange","lightgrey")[DT$finalModel$frame$yval])
+fancyRpartPlot(DT$finalModel, caption = NULL,clip.right.labs = FALSE,type = 4,yesno=2)
+```
+
+Pruned tree
+```{r}
+mytree2 <- prune(DT$finalModel, cp = 0.0015)
+```
+Getting a tree rules
+```{r}
+dt_rules<-rpart.rules(mytree2,cover=T)
+dt_rules
+```
+Pruned tree plot
+```{r}
+prp(mytree2, extra = 6,
+box.col = c("orange","lightgrey")[mytree2$frame$yval])
+```
+
+
+Optimal cut-off point search for RF
+
+```{r message=FALSE, warning=FALSE}
+pred_DT<-predict(DT, test, "prob")[,2]
+test$pred_DT<-pred_DT
+
+opt_DT_ROC01<-optimal.cutpoints(X = "pred_DT", 
+                                status = "class1", 
+                                tag.healthy = 1, 
+                                direction=">",
+                                methods = "ROC01", 
+                                data = test, 
+                                ci.fit = TRUE, 
+                                conf.level = 0.95, 
+                                trace = T)
+
+
+```
+
+```{r}
+#results fo cut-off optimilasation
+opt_DT_ROC01
+```
+Creating explainer for Decision Tree
+
+```{r}
+start<-Sys.time()
+
+# Creating the explainers
+
+# in dataset only features should be included
+cols<-colnames(train)[-20]
+
+#prediction function
+p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+
+#target variable
+yTest<-ifelse(test$class=="yes",1,0)
+
+# Creating explainers for model - DALEX
+
+explainer_dt <- explain(DT,
+                        data = test[,cols],
+                        y =yTest,
+                        predict_function = p_fun,
+                        label = 'dt')
+
+stop<-Sys.time()
+
+stop-start
+```
+
+
+Gini and Confusion matrix metrics results
+
+```{r}
+#gini
+2*ci.auc(test$class,pred_DT)-1
+
+#confusion matrices metrics
+mean(pred_DT)
+confusionMatrix(factor(ifelse(pred_DT>mean(test$class1),"yes","no")),test$class,positive ="yes")
+confusionMatrix(factor(ifelse(pred_DT>opt_DT_ROC01$ROC01$Global$optimal.cutoff$cutoff,"yes","no")), test$class, positive ="yes")
+confusionMatrix(factor(ifelse(pred_DT>0.63,"yes","no")),test$class,positive ="yes")
+```
+
+
+
+
+Random Forest training using Caret
+
+```{r warning=FALSE}
+
+  # start_time <- Sys.time()
+  # RF <- train(class~.,
+  #             data=train,
+  #             method='ranger',
+  #             trControl=trainControl(summaryFunction=twoClassSummary,
+  #                                    classProbs = TRUE,
+  #                                    method="cv",
+  #                                    number=10,
+  #                                    search = "random"),
+  #             metric='ROC',
+  #             tuneLength = 30,
+  #             importance = 'impurity',
+  #             verbose = TRUE)
+  # 
+  # end_time <- Sys.time()
+  # rf_time<-end_time - start_time
+  # #Time difference of 1.603467 hours
+
+
+  # saveRDS(RF, file = "RF_caret.rds")
+
+
+# 
+# library(MASS)
+# library(randomForest)
+# library(caret)
+# library(parallel)
+# library(foreach)
+# library(doParallel)
+# 
+# 
+#   start_time <- Sys.time()
+#   # data_caret[,"def"]<-ifelse(data_caret[,"def"]==1,"Yes","No")
+# 
+# 
+# 
+# 
+#   trainRFX<-train[,c(cols)]
+#   trainRFY<-train$class
+# 
+# 
+#   no_cores <- detectCores() - 1
+#   cl <- makePSOCKcluster(no_cores, outfile = "debug.txt")
+#   registerDoParallel(cl)
+# 
+#   seeds <- vector(mode = "list", length = nrow(train) + 1)
+#   seeds <- lapply(seeds, function(x) 1:11)
+# 
+# 
+# 
+#   fitControl <- trainControl(
+#                              method = "cv", number = 10,
+#                              # method = "adaptive_cv",
+#                              # number = 10, repeats = 10,
+#                              # adaptive = list(min = 5, alpha = 0.05,
+#                              #                   method = "gls", complete = TRUE),
+#                              returnResamp="all",
+#                              #    ## Estimate class probabilities
+#                              classProbs = T,
+#                              #    ## Evaluate performance using
+#                              #    ## the following function
+#                              summaryFunction = twoClassSummary,
+#                              savePredictions = T,
+#                              search = "random"
+#                              )
+# 
+#   rf <- train(class~., data=train,
+#                   # preProc = c("center", "scale"),
+#                   method =  'rf',
+#                   importance=TRUE,
+#                   trControl = fitControl,
+#                   # ntree=500,
+#                   metric="ROC",
+#                   tuneLength = tuneL
+# 
+#   )
+# 
+#   stopCluster(cl)
+#   registerDoSEQ()
+#   end_time <- Sys.time()
+#   rf_time<-end_time - start_time
+#   rf_time
+#   #Time difference of Time difference of 5.661117 hours hours
+# 
+# 
+# 
+# 
+# saveRDS(rf, file = "RF_caret.rds")
+RF<-readRDS(file = "RF_caret.rds")
+
+
+```
+
+Caret has a few very useful results kept that helps to understand how the moedel was tunned
+
+
+Plots showing how AUC is changing while different parameters have been checked.
+
+
+```{r}
+# plot showing results depending on tunning parameters
+ggplot(RF) + theme(legend.position = "top")
+
+```
+Conclusions:
+  1.Best results for 7-11 features
+  
+
+
+Optimal cut-off point search for RF
+
+```{r message=FALSE, warning=FALSE}
+pred_RF<-predict(RF, test, "prob")[,2]
+test$pred_RF<-pred_RF
+
+opt_RF_ROC01<-optimal.cutpoints(X = "pred_RF", 
+                                status = "class1", 
+                                tag.healthy = 1, 
+                                direction=">",
+                                methods = "ROC01", 
+                                data = test, 
+                                ci.fit = TRUE, 
+                                conf.level = 0.95, 
+                                trace = T)
+
+
+```
+
+```{r}
+#results fo cut-off optimilasation
+opt_RF_ROC01
+```
+Creating explainer for Random Forest
+
+```{r}
+start<-Sys.time()
+
+# Creating the explainers
+
+# in dataset only features should be included
+cols<-colnames(train)[-20]
+
+#prediction function
+p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+
+#target variable
+yTest<-ifelse(test$class=="yes",1,0)
+
+# Creating explainers for model - DALEX
+
+explainer_rf <- explain(RF,
+                        data = test[,cols],
+                        y =yTest,
+                        predict_function = p_fun,
+                        label = 'rf')
+
+stop<-Sys.time()
+
+stop-start
+```
+
+
+Gini and Confusion matrix metrics results
+
+```{r}
+#gini
+2*ci.auc(test$class,pred_RF)-1
+
+#confusion matrices metrics
+mean(pred_RF)
+confusionMatrix(factor(ifelse(pred_RF>mean(test$class1),"yes","no")),test$class,positive ="yes")
+confusionMatrix(factor(ifelse(pred_RF>opt_RF_ROC01$ROC01$Global$optimal.cutoff$cutoff,"yes","no")), test$class, positive ="yes")
+confusionMatrix(factor(ifelse(pred_RF>0.63,"yes","no")),test$class,positive ="yes")
+```
+
+Finding simpler RF model close to the best solution 
+
+```{r}
+RF$results %>% arrange(desc(ROC))
+```
+
+```{r}
+# Simpler model with good enough quality
+
+simpleRF <- tolerance(RF$results, metric = "ROC", 
+                         tol = 2, maximize = TRUE) 
+
+cat("best model within 2 pct of best:\n")
+RF$results[simpleRF,1:4]
+```
+
+### Training XGB with Caret
+
+```{r}
+
+  # start_time <- Sys.time()
+  # 
+  # 
+  # XGB <- train(class~., data=train, method='xgbTree', trControl=trainControl
+  # (summaryFunction=twoClassSummary, classProbs = TRUE, method="cv", number=10,
+  # search = "random"), metric = "ROC", tuneLength = tuneL, resamples = "all",
+  # verbose = TRUE)
+  # 
+  # stop<-Sys.time()
+  # 
+  # stop-start
+
+
+  # saveRDS(XGB, file = "XGB.rds")
+  XGB<-readRDS(file = "XGB.rds")
+```
+
+Hyperparameter tuning results
+```{r}
+# plot showing results depending on tunning parameters
+ggplot(XGB) + theme(legend.position = "top")
+```
+Conclusions:
+  
+    1. Very hard to identify storng patterns
+    2. Max tree depth - small more robust
+    3. Shrinkage - not higher than 0.2
+    4. Subsamples Percentage - between than 0.6-0.8
+
+
+
+AUC density plot
+```{r message=FALSE, warning=FALSE}
+trellis.par.set(caretTheme())
+densityplot(XGB, pch = "|")
+```
+
+Optimal cut-off results for XGB
+```{r message=FALSE, warning=FALSE}
+pred_XGB<-predict(XGB, test, "prob")[,2]
+test$pred_XGB<-pred_XGB
+test$class1<-ifelse(test$class=="yes",1,0)
+
+opt_XGB_ROC01<-optimal.cutpoints(X = "pred_XGB", 
+                                 status = "class1", 
+                                 tag.healthy = 1, 
+                                 direction=">",
+                                 methods = "ROC01", 
+                                 data = test, 
+                                 ci.fit = TRUE, 
+                                 conf.level = 0.95, 
+                                 trace = T)
+
+opt_XGB_ROC01
+```
+
+Explainer for XGB
+```{r}
+start<-Sys.time()
+
+# Creating the explainers
+
+# in dataset only features should be included
+cols<-colnames(train)[-20]
+
+#prediction function
+p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+
+#target variable
+yTest<-ifelse(test$class=="yes",1,0)
+
+# Creating explainers for model - DALEX
+
+explainer_xgb <- explain(XGB,
+                        data = test[,cols],
+                        y =yTest,
+                        predict_function = p_fun,
+                        label = 'xgb')
+
+stop<-Sys.time()
+
+stop-start
+```
+
+
+
+
+Gini and confusion matrices metrics
+```{r}
+2*ci.auc(test$class,pred_XGB)-1
+
+mean(pred_XGB)
+confusionMatrix(factor(ifelse(pred_XGB>mean(test$class1),"yes","no")),test$class,positive ="yes")
+confusionMatrix(factor(ifelse(pred_XGB>opt_XGB_ROC01$ROC01$Global$optimal.cutoff$cutoff,"yes","no")), test$class, positive ="yes")
+confusionMatrix(factor(ifelse(pred_XGB>0.63,"yes","no")),test$class,positive ="yes")
+```
+
+
+Finding simpler XGB model close to the best solution
+
+```{r tidy: (TRUE)}
+XGB$results  %>% arrange(desc(ROC))
+```
+
+```{r}
+simpleXGB <- tolerance(XGB$results, metric = "ROC", 
+                       tol = 2, maximize = T) 
+
+cat("best model within 2 pct of best:\n")
+XGB$results[simpleXGB,1:8]
+
+```
+
+```{r}
+# install.packages("DiagrammeR")
+library(DiagrammeR)
+xgb.plot.tree(feature_names = XGB$finalModel$feature_names, model = XGB$finalModel,trees=0)
+best_splits<-xgb.model.dt.tree(feature_names = XGB$finalModel$feature_names, model = XGB$finalModel) %>% filter(Node<4 & Tree<5)
+
+```
+
+
+
+Using information from ML algorithms
+
+
+New categorisation based on Clustering results from ALE/PDP plot.
+```{r}
+library(rSAFE)
+safe_extractor <- safe_extraction(explainer_xgb,response_type="ale", penalty = "MBIC", method="single", verbose = T,no_segments=5)
+safe_extractor$variables_info
+safe_extractor
+```
+
+```{r}
+plot(safe_extractor, variable = "euribor3m")
+plot(safe_extractor, variable = "nr.employed")
+plot(safe_extractor, variable = 'marital')
+plot(safe_extractor, variable = 'job')
+```
+
+For each pair of features it performs values permutation in order to evaluate their non_additive effect
+Difference between joint loss of quality & separate
+```{r}
+safely_detect_interactions(explainer_xgb, inter_param = 0.5,inter_threshold = 0.5, verbose = TRUE)
+```
+
+
+```{r}
+test1 <- safely_transform_data(safe_extractor, test, verbose = T)
+test2 <- test1[,c(colnames(test1)[grepl("_new",colnames(test1))],"contact","class")]
+train1 <- safely_transform_data(safe_extractor, train, verbose = T)
+train2 <- train1[,c(colnames(train1)[grepl("_new",colnames(train1))],"contact","class")]
+```
+
+
+
+
+```{r}
+  library(MASS)
+  library(randomForest)
+  library(caret)
+  library(parallel)
+  library(foreach)
+  library(doParallel)
+
+
+  start_time <- Sys.time()
+
+
+
+  no_cores <- detectCores() - 1
+  cl <- makePSOCKcluster(no_cores, outfile = "debug.txt")
+  registerDoParallel(cl)
+
+  seeds <- vector(mode = "list", length = nrow(train) + 1)
+  seeds <- lapply(seeds, function(x) 1:10)
+
+
+
+  fitControl <- trainControl(method = "cv",
+                            number = 10,
+                             returnResamp="final",
+                             #    ## Estimate class probabilities
+                             classProbs = T,
+                             #    ## Evaluate performance using
+                             #    ## the following function
+                             summaryFunction = twoClassSummary,
+                             savePredictions = T,
+                             search = "random"
+                             )
+
+  lr_reg_rs <- train(class~.,data=train2,
+                  # preProc = c("center", "scale"),
+                  method =  'glmnet',
+                  family="binomial",
+                  trControl = fitControl,
+                  metric="ROC",
+                  tuneLength = tuneL
+
+  )
+
+  stopCluster(cl)
+  registerDoSEQ()
+  end_time <- Sys.time()
+  lrrs_time<-end_time - start_time
+  lrrs_time
+  #Time difference of 1.603467 hours
+
+
+
+saveRDS(lr_reg_rs, file = "lr_reg_rs.rds")
+
+lr_reg_rs<-readRDS(file = "lr_reg_rs.rds")
+
+
+par(mfrow = c(2, 1))
+plot(lr_reg_rs)
+ggplot(lr_reg_rs, ask = FALSE)
+par(mfrow = c(1, 1))
+
+
+```
+
+```{r}
+
+lr_reg_rs_params <- data.frame(coef.name = dimnames(coef(lr_reg_rs$finalModel))[[1]], coef.value = matrix(coef(lr_reg_rs$finalModel)))
+lr_reg_rs_params
+
+```
+
+
+```{r}
+
+lr_reg_rs$results %>% arrange(desc(ROC))
+
+```
+
+
+```{r}
+start<-Sys.time()
+
+# Creating the explainers
+
+# in dataset only features should be included
+cols<-colnames(train)[-20]
+
+#prediction function
+p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+
+#target variable
+yTest<-ifelse(test$class=="yes",1,0)
+
+# Creating explainers for model - DALEX
+
+explainer_lr_reg_rs <- explain(lr_reg_rs,
+                        data = test2[,-20],
+                        y =yTest,
+                        predict_function = p_fun,
+                        label = 'lr_rs')
+
+stop<-Sys.time()
+
+stop-start
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+#prediction probability based on LR
+
+pred_lr_reg_rs<-predict(lr_reg_rs, test2, "prob")[,2]
+test2$pred_lr_reg_rs<-pred_lr_reg_rs
+
+#numeric verison of the target
+
+test2$class1<-ifelse(test2$class=="yes",1,0)
+
+
+
+#findig an optimal cut-off point 
+opt_pred_lr_reg_rs_ROC01<-optimal.cutpoints(X = "pred_lr_reg_rs", 
+                                status = "class1", 
+                                tag.healthy = 1, 
+                                direction=">",
+                                methods = "ROC01", 
+                                data = test2, 
+                                ci.fit = TRUE, 
+                                conf.level = 0.95, 
+                                trace = T)
+
+opt_pred_lr_reg_rs_ROC01$ROC01$Global$optimal.cutoff$cutoff
+```
+
+
+```{r}
+options(scipen=9999)
+
+#gini
+2*score_auc(explainer_lr_reg_rs)$score-1
+2*ci.auc(test$class,pred_lr_reg_rs)-1
+
+#confusion matrices for different cut-offs
+
+mean(test$class1)
+confusionMatrix(factor(ifelse(pred_lr_reg_rs>mean(test$class1),"yes","no")),test$class,positive ="yes")
+confusionMatrix(factor(ifelse(pred_lr_reg_rs>opt_pred_lr_reg_rs_ROC01$ROC01$Global$optimal.cutoff$cutoff,"yes","no")), test$class, positive ="yes")
+confusionMatrix(factor(ifelse(pred_lr_reg_rs>0.5,"yes","no")),test$class,positive ="yes")
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+Comparison of all models
+
+```{r}
+
+#summary of all resample results
+
+resamps <- resamples(list(LR = LR,
+                          LR_REG=lr_reg,
+                          LR_REG_RS=lr_reg_rs,
+                          DT = DT,
+                          RF = RF,
+                          XGB=XGB))
+resamps
+summary(resamps)
+
+```
+
+Comparison of AUC for all 3 models
+```{r message=FALSE, warning=FALSE}
+trellis.par.set(caretTheme())
+dotplot(resamps, metric = "ROC")
+```
+Conclusions:
+  1. XGB best
+  2. LR, LR_REG second best choice
+  3. LR_REG_RS, RF
+  4. DT
+
+
+
+Copmparison of AUC for all 3 models
+```{r}
+splom(resamps)
+```
+Conclusions:
+  1. XGB always better than the others
+
+MOdification of a function to assess F1 score
+  
+```{r}
+library(ggplot2)
+scores <- c("one_minus_gini", "one_minus_precision", "one_minus_recall", "one_minus_f1", "one_minus_acc")
+
+scores <- c("one_minus_gini", "one_minus_acc")
+
+
+
+one_minus_f1_mod <- function (object, cutoff = 0.11) {
+      if (!is.null(data)) 
+        object$data <- data
+    confusionmatrix<-function (explainer, cutoff = cutoff) 
+    {
+        yhat <- as.numeric(explainer$y_hat > cutoff)
+        TP <- sum(yhat[yhat == 1] == explainer$y[yhat == 1])
+        FP <- length(yhat[yhat == 1]) - TP
+        TN <- sum(yhat[yhat == 0] == explainer$y[yhat == 0])
+        FN <- length(yhat[yhat == 0]) - TN
+        list(TP = TP, FP = FP, TN = TN, FN = FN)
+    }
+    conf <- confusionmatrix(object, cutoff)
+    ret <- (2 * (conf$TP/(conf$TP + conf$FP)) * (conf$TP/(conf$TP + 
+        conf$FN)))/(conf$TP/(conf$TP + conf$FN) + conf$TP/(conf$TP + 
+        conf$FP))
+    F1_results <- list(score = 1 - ret)
+    return(F1_results)
+}
+
+new_score <- function(obj) list(score_one_minus_f1(obj, cutoff = 0.11))
+one_minus_f1_mod(explainer_lr)
+
+
+```
+
+
+
+```{r}
+
+mp_lr  <- auditor::model_performance(explainer_lr, score = c("one_minus_gini", "one_minus_acc"),new_score=one_minus_f1_mod)
+mp_lr
+
+mp_lr_reg  <- auditor::model_performance(explainer_lr_reg, score = c("one_minus_gini", "one_minus_acc"),new_score=one_minus_f1_mod)
+mp_lr_reg
+
+mp_lr_stepwise  <- auditor::model_performance(explainer_LR_stepwise, score = c("one_minus_gini", "one_minus_acc"),new_score=one_minus_f1_mod)
+mp_lr_stepwise
+
+mp_lr_reg_rs  <- auditor::model_performance(explainer_lr_reg_rs, score = c("one_minus_gini", "one_minus_acc"),new_score=one_minus_f1_mod)
+mp_lr_reg_rs
+
+mp_dt  <- auditor::model_performance(explainer_dt, score = c("one_minus_gini", "one_minus_acc"),new_score=one_minus_f1_mod)
+mp_dt
+
+mp_rf  <- auditor::model_performance(explainer_rf, score = c("one_minus_gini", "one_minus_acc"),new_score=one_minus_f1_mod)
+mp_rf
+
+mp_xgb  <- auditor::model_performance(explainer_xgb, score = c("one_minus_gini", "one_minus_acc"),new_score=one_minus_f1_mod)
+mp_xgb
+
+
+plot_radar(mp_lr,mp_lr_reg,mp_lr_reg_rs,mp_dt,mp_rf,mp_xgb)
+```
+
+```{r}
+me_lr <- model_evaluation(explainer_lr)
+me_lr_reg <- model_evaluation(explainer_lr_reg)
+me_lr_stepwise <- model_evaluation(explainer_LR_stepwise)
+me_lr_reg_rs <- model_evaluation(explainer_lr_reg_rs)
+me_xgb <- model_evaluation(explainer_xgb)
+me_dt <- model_evaluation(explainer_dt)
+me_rf <- model_evaluation(explainer_rf)
+me_xgb <- model_evaluation(explainer_xgb)
+
+# ROC
+plot_roc(me_lr,me_lr_reg,me_lr_reg_rs,me_dt,me_rf,me_xgb)
+
+# LIFT
+plot_lift(me_lr,me_lr_reg,me_lr_reg_rs,me_dt,me_rf,me_xgb)
+
+
+
+
+# 
+# res_lm<-model_residual(explainer_lr)
+
+# plot_residual_boxplot(res_lm)
+# 
+# plot_prediction(res_lm, abline = TRUE)
+# plotD3_prediction(res_lm, abline = TRUE, scale_plot = TRUE)
+# 
+# 
+# plot_residual(res_lm, smooth = TRUE)
+# plotD3_residual(res_lm, variable = "duration", smooth = TRUE, scale_plot = TRUE)
+# 
+# plot_residual_density(res_lm)
+
+```
+  
+  
+
+##Global explanation
+
+###Feature Importance
+
+Feature importance from Caret - case specific
+
+
+```{r message=FALSE, warning=FALSE}
+#Feature importance from Caret - case specific
+
+
+#variable importance for the lr, rf and xgb models
+
+# vip package
+vip(LR)
+vip(lr_reg)
+vip(lr_reg_rs)
+vip(RF$finalModel)
+vip(XGB)
+vip(DT)
+```
+
+Feature importance from Ingridients - permutation based
+
+```{r message=FALSE, warning=FALSE}
+
+#Feature importance from Ingridients - permutation based
+  
+
+  # piv_rf <-ingredients::feature_importance(explainer_rf,loss_one_minus_auc, B = 20)
+  # piv_lr <-ingredients::feature_importance(explainer_lr,loss_one_minus_auc, B = 20)
+  # piv_xgb <-ingredients::feature_importance(explainer_xgb,loss_one_minus_auc, B = 20)
+  # piv_dt <-ingredients::feature_importance(explainer_dt,loss_one_minus_auc, B = 20)
+  # piv_lr_reg <-ingredients::feature_importance(explainer_lr_reg,loss_one_minus_auc, B = 20)
+  # piv_lr_reg_rs<-ingredients::feature_importance(explainer_lr_reg_rs,loss_one_minus_auc, B = 20)
+  # piv_lr_stepwise<-ingredients::feature_importance(explainer_LR_stepwise,loss_one_minus_auc)
+  # 
+  # saveRDS(piv_rf, file = "piv_rf.rds")
+  # saveRDS(piv_lr, file = "piv_lr.rds")
+  # saveRDS(piv_xgb, file = "piv_xgb.rds")
+  # saveRDS(piv_dt, file = "piv_dt.rds")
+  # saveRDS(piv_lr_reg, file = "piv_lr_reg.rds")
+  # saveRDS(piv_lr_reg_rs, file = "piv_lr_reg_rs.rds")
+  # saveRDS(piv_lr_stepwise, file = "piv_lr_stepwise.rds")
+  # 
+  piv_rf<-readRDS("piv_rf.rds")
+  piv_lr<-readRDS("piv_lr.rds")  
+  piv_xgb<-readRDS("piv_xgb.rds")  
+  piv_dt<-readRDS("piv_dt.rds")  
+  piv_lr_reg<-readRDS("piv_lr_reg.rds")
+  piv_lr_reg_rs<-readRDS("piv_lr_reg_rs.rds")  
+  piv_lr_stepwise<-readRDS("piv_lr_stepwise.rds")
+  
+  plot(piv_rf,piv_lr_reg,piv_lr_reg_rs,piv_dt, piv_lr, piv_xgb, bar_width=2)
+  plot(piv_rf,piv_lr, piv_xgb, bar_width=2)
+  plot(piv_xgb,piv_rf, bar_width=2)
+  
+  
+  # piv_rf_diff <-ingredients::feature_importance(explainer_rf,loss_one_minus_auc, B = 10,type="difference")
+  # piv_xgb_diff <-ingredients::feature_importance(explainer_xgb,loss_one_minus_auc, B = 10,type="difference")
+  # saveRDS(piv_rf_diff, file = "piv_rf_diff.rds")
+  # saveRDS(piv_xgb_diff, file = "piv_xgb_diff.rds")
+  piv_rf_diff<-readRDS("piv_rf_diff.rds")
+  piv_xgb_diff<-readRDS("piv_xgb_diff.rds")
+  plot(piv_xgb_diff,piv_rf_diff, bar_width=2)
+
+  
+ piv_rf %>% as_tibble()%>% arrange(desc(dropout_loss)) %>% filter(permutation==0)
+ piv_xgb %>% as_tibble()%>% arrange(desc(dropout_loss)) %>% filter(permutation==0)
+ piv_lr_reg %>% as_tibble()%>% arrange(desc(dropout_loss)) %>% filter(permutation==0)
+```
+
+Conclusions:
+  
+    1. XGB slightly beter than LR, RF poorer
+    2. In all cases nr.employed, emp.var.rate, euribor3m, contact are the most important
+    3. XGB, RF is robust to changes
+    4. LR Siginifcant drop after a few first variables
+
+
+Feature importance from Ingredients with Aspects - permutation based
+
+```{r}
+ #Feature importance from Ingridients with Aspects
+
+  # piv_rf_asp <-ingredients::feature_importance(explainer_rf,
+  #                                          loss_function = loss_one_minus_auc,
+  #                                          variable_groups =list(
+  #                                            "client" = c("age",  
+  #                                                         "marital", 
+  #                                                         "education"),
+  #                                            "work" = c("job"),
+  #                                            "credit" = c("default", 
+  #                                                         "housing", 
+  #                                                         "loan"),
+  #                                            "current_campaign" = c("contact", 
+  #                                                                   "day_of_week", 
+  #                                                                   "month",                                                                                                                          "campaign"),
+  #                                             "previous_campaign" = c("pdays",
+  #                                                                     "previous",
+  #                                                                     "poutcome"),
+  #                                            "macro" = c("emp.var.rate",
+  #                                                         "cons.price.idx",
+  #                                                         "cons.conf.idx",
+  #                                                        "euribor3m",
+  #                                                        "nr.employed"
+  #                                                        )))
+  # 
+  # piv_lr_asp <-ingredients::feature_importance(explainer_lr,
+  #                                              loss_function = loss_one_minus_auc,
+  #                                              variable_groups =list(
+  #                                            "client" = c("age",  
+  #                                                         "marital", 
+  #                                                         "education"),
+  #                                            "work" = c("job"),
+  #                                            "credit" = c("default", 
+  #                                                         "housing", 
+  #                                                         "loan"),
+  #                                            "current_campaign" = c("contact", 
+  #                                                                   "day_of_week", 
+  #                                                                   "month",                                                                                                                          "campaign"),
+  #                                             "previous_campaign" = c("pdays",
+  #                                                                     "previous",
+  #                                                                     "poutcome"),
+  #                                            "macro" = c("emp.var.rate",
+  #                                                         "cons.price.idx",
+  #                                                         "cons.conf.idx",
+  #                                                        "euribor3m",
+  #                                                        "nr.employed"
+  #                                                        )))
+  # 
+  #   piv_dt_asp <-ingredients::feature_importance(explainer_dt,
+  #                                              loss_function = loss_one_minus_auc,
+  #                                              variable_groups =list(
+  #                                            "client" = c("age",  
+  #                                                         "marital", 
+  #                                                         "education"),
+  #                                            "work" = c("job"),
+  #                                            "credit" = c("default", 
+  #                                                         "housing", 
+  #                                                         "loan"),
+  #                                            "current_campaign" = c("contact", 
+  #                                                                   "day_of_week", 
+  #                                                                   "month",                                                                                                                          "campaign"),
+  #                                             "previous_campaign" = c("pdays",
+  #                                                                     "previous",
+  #                                                                     "poutcome"),
+  #                                            "macro" = c("emp.var.rate",
+  #                                                         "cons.price.idx",
+  #                                                         "cons.conf.idx",
+  #                                                        "euribor3m",
+  #                                                        "nr.employed"
+  #                                                        )))
+  # 
+  # 
+  # piv_xgb_asp <-ingredients::feature_importance(explainer_xgb,
+  #                                          loss_function = loss_one_minus_auc,
+  #                                          variable_groups =list(
+  #                                            "client" = c("age",  
+  #                                                         "marital", 
+  #                                                         "education"),
+  #                                            "work" = c("job"),
+  #                                            "credit" = c("default", 
+  #                                                         "housing", 
+  #                                                         "loan"),
+  #                                            "current_campaign" = c("contact", 
+  #                                                                   "day_of_week", 
+  #                                                                   "month",                                                                                                                          "campaign"),
+  #                                             "previous_campaign" = c("pdays",
+  #                                                                     "previous",
+  #                                                                     "poutcome"),
+  #                                            "macro" = c("emp.var.rate",
+  #                                                         "cons.price.idx",
+  #                                                         "cons.conf.idx",
+  #                                                        "euribor3m",
+  #                                                        "nr.employed"
+  #                                                        )))
+  # 
+  #  piv_lr_stepwise_asp <-ingredients::feature_importance(explainer_LR_stepwise,
+  #                                          loss_function = loss_one_minus_auc,
+  #                                          variable_groups =list(
+  #                                            "client" = c("age",  
+  #                                                         "marital", 
+  #                                                         "education"),
+  #                                            "work" = c("job"),
+  #                                            "credit" = c("default", 
+  #                                                         "housing", 
+  #                                                         "loan"),
+  #                                            "current_campaign" = c("contact", 
+  #                                                                   "day_of_week", 
+  #                                                                   "month",                                                                                                                          "campaign"),
+  #                                             "previous_campaign" = c("pdays",
+  #                                                                     "previous",
+  #                                                                     "poutcome"),
+  #                                            "macro" = c("emp.var.rate",
+  #                                                         "cons.price.idx",
+  #                                                         "cons.conf.idx",
+  #                                                        "euribor3m",
+  #                                                        "nr.employed"
+  #                                                        )))
+  #  
+  #   piv_lr_reg_asp <-ingredients::feature_importance(explainer_lr_reg,
+  #                                          loss_function = loss_one_minus_auc,
+  #                                          variable_groups =list(
+  #                                            "client" = c("age",  
+  #                                                         "marital", 
+  #                                                         "education"),
+  #                                            "work" = c("job"),
+  #                                            "credit" = c("default", 
+  #                                                         "housing", 
+  #                                                         "loan"),
+  #                                            "current_campaign" = c("contact", 
+  #                                                                   "day_of_week", 
+  #                                                                   "month",                                                                                                                          "campaign"),
+  #                                             "previous_campaign" = c("pdays",
+  #                                                                     "previous",
+  #                                                                     "poutcome"),
+  #                                            "macro" = c("emp.var.rate",
+  #                                                         "cons.price.idx",
+  #                                                         "cons.conf.idx",
+  #                                                        "euribor3m",
+  #                                                        "nr.employed"
+  #                                                        )))
+  #   
+  #    piv_lr_reg_rs_asp <-ingredients::feature_importance(explainer_lr_reg_rs,
+  #                                          loss_function = loss_one_minus_auc,
+  #                                          variable_groups =list(
+  #                                            "client" = c("age_new",  
+  #                                                         "marital_new", 
+  #                                                         "education_new"),
+  #                                            "work" = c("job_new"),
+  #                                            "credit" = c("default_new", 
+  #                                                         "housing_new", 
+  #                                                         "loan_new"),
+  #                                            "current_campaign" = c("contact", 
+  #                                                                   "day_of_week_new", 
+  #                                                                   "month_new",                                                                                                                          "campaign_new"),
+  #                                             "previous_campaign" = c("pdays_new",
+  #                                                                     "previous_new",
+  #                                                                     "poutcome_new"),
+  #                                            "macro" = c("emp.var.rate_new",
+  #                                                         "cons.price.idx_new",
+  #                                                         "cons.conf.idx_new",
+  #                                                        "euribor3m_new",
+  #                                                        "nr.employed_new"
+  #                                                        )))
+  # 
+  #    
+  # saveRDS(piv_lr_asp, file = "piv_lr_asp.rds")
+  # saveRDS(piv_lr_reg_asp, file = "piv_lr_reg_asp.rds")
+  # saveRDS(piv_lr_reg_rs_asp, file = "piv_lr_reg_rs_asp.rds")
+  # saveRDS(piv_rf_asp, file = "piv_rf_asp.rds")
+  # saveRDS(piv_dt_asp, file = "piv_dt_asp.rds")
+  # saveRDS(piv_xgb_asp, file = "piv_xgb_asp.rds")
+  # saveRDS(piv_lr_stepwise, file = "piv_lr_stepwise.rds")
+  
+  piv_lr_asp<-readRDS("piv_lr_asp.rds")
+  piv_lr_reg_asp<-readRDS("piv_lr_reg_asp.rds")  
+  piv_lr_reg_rs_asp<-readRDS("piv_lr_reg_rs_asp.rds")  
+  piv_rf_asp<-readRDS("piv_rf_asp.rds")  
+  piv_dt_asp<-readRDS("piv_dt_asp.rds")
+  piv_xgb_asp<-readRDS("piv_xgb_asp.rds")  
+  # piv_lr_stepwise<-readRDS("piv_lr_stepwise.rds")  
+     
+     
+  plot(piv_lr_asp,piv_lr_reg_asp,piv_lr_reg_rs_asp,piv_rf_asp,piv_dt_asp,piv_xgb_asp, bar_width=2)
+
+
+```
+
+Conclusions:
+  1. Macro data absolutely the most important
+  2. Second Previous Current Campaign
+
+##Global dependency profiles 
+
+###PDP
+PDP for duration from RF model
+
+```{r}
+  selected_cases100<-ingredients::select_sample(test, n = 1000)
+  cp_xgb <- ingredients::ceteris_paribus(explainer_xgb, selected_cases100)
+  pdp_empl_cp_xgb <- ingredients::aggregate_profiles(cp_xgb, variables = "nr.employed") 
+  plot(pdp_empl_cp_xgb) + show_rugs(cp_xgb, variables = "nr.employed", color = "red")
+```
+Conclusions:
+  
+    1. 2 very different groups related to PTD
+
+
+
+PDP for all numeric variables from RF model
+
+```{r}
+  pdp_empl_cp_xgb <- ingredients::aggregate_profiles(cp_xgb,variable_type = "categorical") 
+  plot(pdp_empl_cp_xgb)
+```
+Conclusions:
+
+    1. Nr.employed, euribor, pdays and campaign have visible influence
+ 
+
+
+##PDP, ALE and CDP plots
+Comparison of PDP, ALE and ICE plots 
+
+```{r}
+  pdp_xgb_p <- aggregate_profiles(cp_xgb, variables = "euribor3m", type = "partial")
+  pdp_xgb_p$`_label_` <- "xgb_partial"
+  pdp_xgb_c <- aggregate_profiles(cp_xgb, variables = "euribor3m", type = "conditional")
+  pdp_xgb_c$`_label_` <- "xgb_conditional"
+  pdp_xgb_a <- aggregate_profiles(cp_xgb, variables = "euribor3m", type = "accumulated")
+  pdp_xgb_a$`_label_` <- "xgb_accumulated"
+  
+  plot(pdp_xgb_p, pdp_xgb_c, pdp_xgb_a, color = "_label_")
+  
+```
+Conclusions:
+
+    1. All profiles look similar - not a big problem with collinearity, but conditional seems different.
+
+
+###Stability analysis of responses for Duration
+
+```{r}
+  plot(cp_xgb, variables = "euribor3m",color="lightgrey") +
+    show_observations(cp_xgb, variables = "euribor3m") +
+    show_rugs(cp_xgb, variables = "euribor3m", color = "red") +
+    show_aggregated_profiles(pdp_xgb_p, size = 3, color = "_label_")
+```
+Conclusions:
+  
+    1. Profiles are generally stable
+
+
+###Stability analysis of responses for Duration - wrt contact groups
+
+```{r}
+
+pdp_euribor_housing_cp_xgb <- ingredients::aggregate_profiles(cp_xgb, variables = "euribor3m", groups="contact")
+  
+plot(cp_xgb, variables = "euribor3m",color="lightgrey") +
+  show_observations(cp_xgb, variables = "euribor3m") +
+  show_rugs(cp_xgb, variables = "euribor3m", color = "red") +
+  show_aggregated_profiles(pdp_euribor_housing_cp_xgb, size = 3, color="_label_")
+  
+```
+Conclusions:
+
+    1. Contact is shifting PDP by a constant values (additive effects)
+
+
+
+###PDP and ALE plots for different models
+
+
+```{r}
+
+  pdp_euribor_lr <- ingredients::partial_dependency(explainer_lr , variables = "euribor3m")
+  pdp_euribor_lr_reg <- ingredients::partial_dependency(explainer_lr_reg , variables = "euribor3m")
+  pdp_euribor_lr_reg_rs <- ingredients::partial_dependency(explainer_lr_reg_rs , variables = "euribor3m_new")
+  pdp_euribor_dt <- ingredients::partial_dependency(explainer_dt , variables = "euribor3m")
+  pdp_euribor_rf <- ingredients::partial_dependency(explainer_rf, variables = "euribor3m")
+  pdp_euribor_xgb <- ingredients::partial_dependency(explainer_xgb , variables = "euribor3m")
+  
+  ale_euribor_lr <- ingredients::accumulated_dependency(explainer_lr , variables = "euribor3m")
+  ale_euribor_lr_reg <- ingredients::accumulated_dependency(explainer_lr_reg , variables = "euribor3m")
+  ale_euribor_lr_reg_rs <- ingredients::accumulated_dependency(explainer_lr_reg_rs, variables = "euribor3m_new")
+  ale_euribor_dt <- ingredients::accumulated_dependency(explainer_dt , variables = "euribor3m")
+  ale_euribor_rf <- ingredients::accumulated_dependency(explainer_rf, variables = "euribor3m")
+  ale_euribor_xgb <- ingredients::accumulated_dependency(explainer_xgb , variables = "euribor3m")
+  
+```
+
+
+
+```{r}
+plot(pdp_euribor_lr, pdp_euribor_lr_reg,pdp_euribor_dt, pdp_euribor_rf, pdp_euribor_xgb)
+plot(ale_euribor_lr, pdp_euribor_lr_reg, ale_euribor_dt,ale_euribor_rf,ale_euribor_xgb)
+  
+```
+  Conclusions
+    
+    1. LR_Reg didn't include
+    2. LR is reverted 
+    3. RF and XGB have similar PDP
+
+###PDP profiles for Categorical data
+
+```{r}
+  pdp_all_cp_xgb <- ingredients::aggregate_profiles(cp_xgb,variable_type = "categorical") 
+  plot(pdp_all_cp_xgb)
+```
+Conclusions:
+  
+    1. Month has the most different levels
+    2. Poutcome
+    3. Rest is less distinguishable
+
+```{r}
+  pdp_month_cp_rf <- ingredients::aggregate_profiles(cp_xgb,variable_type = "categorical",variables= "month") 
+  plot(pdp_month_cp_rf)
+```
+  
+  
+#Local explanation
+
+Let's imagine that we want to assess proponsity to buy of Johnny
+```{r}
+  johnny <-ingredients::select_sample(test, n = 1,seed=1916)
+  johnny
+  
+  
+```
+
+###Ceteris Paribus plots
+We are creating a CP profiles for Johnny based on different models
+```{r}
+  johnny_rf <- ingredients::ceteris_paribus(explainer_rf, johnny)
+  johnny_lr <- ingredients::ceteris_paribus(explainer_lr, johnny)
+  johnny_lr_reg <- ingredients::ceteris_paribus(explainer_lr_reg, johnny)
+  johnny_dt <- ingredients::ceteris_paribus(explainer_dt, johnny)
+  johnny_xgb <- ingredients::ceteris_paribus(explainer_xgb, johnny)
+  
+  johnny_rf
+```
+
+###CP profiles for numerical data is easy to present at one graph:
+  
+```{r}
+plot(johnny_lr,johnny_lr_reg,johnny_rf,johnny_dt, johnny_xgb,color="_label_", variables = c("euribor3m", "nr.employed")) +
+    show_observations(johnny_lr,johnny_lr_reg,johnny_rf,johnny_dt, johnny_xgb, variables = c("euribor3m", "nr.employed")) +
+      scale_color_discrete(name = "Selected models:") + ylim(0,1) +
+    ggtitle("Ceteris Paribus Profiles for Johnny")
+```
+Conclusions:
+  
+    1. Euribor affects PTD - similar to average profile (non-colinear variable)
+    2. Nr.employed as well
+    3. Here recomendation for Johnny is different to explain
+
+
+###For categorical data it is better to look at them separately:
+
+```{r}
+  plot(johnny_xgb,color="_label_", variables = c("job", "marital")) +
+    ggtitle("Ceteris Paribus Profiles for Johnny")
+```
+Conclusions:
+ 
+    1. Change work Johnny :)
+    3. Get married or take a divorce :)
+
+
+
+###Two-dimensional ceteris paribus plots - very useful in interactions identification
+ 
+```{r}
+ wi_xgb_2d <- ceteris_paribus_2d(explainer_xgb, observation = johnny_xgb, variables = c("age", "euribor3m","pdays"))
+  head(wi_xgb_2d)
+  
+  plot(wi_xgb_2d) + 
+    theme(legend.position = "right", legend.direction = "vertical") + ggtitle("Ceteris Paribus 2D Profiles")
+```  
+Conclusions:
+
+    1. Age and pdays is additive
+    2. Euribor and age/pdays - some interactions may be obseerved, but rather not crucial or maybe?
+
+  
+##Local stability analysis
+  
+```{r}
+#selecting neighbours wrt "euribor3m", "month","contact","day_of_week"
+johnny_neighbors1 <- ingredients::select_neighbours(johnny, 
+                                                      test,
+                                                      n = 100,
+                                                      variables = c("euribor3m", "month","contact","day_of_week"))
+johnny_neighbors1 %>% head(5)
+
+# cp for Johnny and neighbours
+
+cp_johnny <- ceteris_paribus(explainer_xgb,
+                             johnny)
+
+cp_johnny_neighbors1 <- ceteris_paribus(explainer_xgb,
+                                        johnny_neighbors1)
+
+```
+
+  
+  
+```{r}
+  plot(cp_johnny_neighbors1, color = '#ceced9', variables = "euribor3m") +
+  show_profiles(cp_johnny, size = 2, variables = "euribor3m") +
+  show_observations(cp_johnny, variables = "euribor3m", size = 5) +
+  ggtitle("Local stability plot for Johnny")
+
+```
+Conclusions:
+  
+    1. Model is stable around Johnny
+
+
+###Oscilations - a method of assessment for local variable importance
+
+```{r}
+  oscillations_johnny_xgb <- calculate_oscillations(johnny_xgb)
+  oscillations_johnny_xgb
+
+  
+  oscillations_johnny_xgb$`_ids_` <- "Johnny"
+  plot(oscillations_johnny_xgb, bar_width=2) + ggtitle("Ceteris Paribus Oscillations")
+```
+  Conclusions:
+    
+      1. For Johnny the most important variable is euribor; 
+      2. 2 campaign
+
+##Local feature importance for aspects
+
+Aspect Importance function takes a sample from a given dataset and modifies it. Modification is
+made by replacing part of its aspects by values from the observation. Then function is calculating
+the difference between the prediction made on modified sample and the original sample. Finally, it
+measures the impact of aspects on the change of prediction by using the linear model or lasso.
+
+```{r}
+  # install.packages("triplot")
+  library(triplot)
+
+  aspects <- list(client = c("age","marital","education"),
+                  work = c("job"),
+                  credit =  c("default","housing","loan"),
+                  current_campaign = c("contact","day_of_week","month","campaign"),
+                  previous_campaign = c("pdays","previous","poutcome"),
+                  macro = c("emp.var.rate","cons.price.idx","cons.conf.idx","euribor3m","nr.employed"))
+                  
+  
+  asp_fi<-aspect_importance(explainer_xgb,
+                    new_observation = johnny,
+                    variable_groups = aspects,
+                    N=1000)
+  
+  #ingredients::add_additional_information(explainer_xgb, johnny, aspects)
+  
+  plot(asp_fi)
+
+```
+Conclusions:
+
+    1. For johnny current campaign is still moste important and affects prognosis negativately
+    2. Pervious Campaign is 4th
+    3. Only positive aspect is client itself
+
+
+###BreakDown - method showing local contribution of variables
+
+```{r}
+bd_rf <- break_down(explainer_rf,johnny)
+
+bd_rf
+```
+ 
+  
+###BreakDown Plots 
+
+# of variables defined automatically, most important variables only
+```{r}
+plot(bd_rf)
+plot(bd_rf, max_features = 7) 
+
+```
+Conclusions:
+
+Decrease:
+    
+    1. Nr.employed & other macro
+    2. pdays=9
+    3. previous=2
+
+
+
+Break Down plot with distribution of different orders
+  
+```{r}
+  bd_rf_order <- break_down(explainer_rf,johnny, keep_distributions=T)
+  plot(bd_rf_order, plot_distributions=T) 
+```
+Description:
+  
+    1. We are starting from the bottom (average prediction)
+    2. The most important change by nr.employed (average change)
+    3. Second most important change by euribor (average increase)
+    4. Etc.
+
+BreakDown with interactions  
+ 
+```{r}
+ bd_rf_int <- break_down(explainer_rf,johnny, interactions=T)
+ plot(bd_rf_int)
+```
+Conclusions:
+  
+      1. Education and job are not additive (in previous BD increse over 3 pp and 4 pp)
+      2. The others are additive
+   
+BreakDown Uncertainty Plot
+  
+```{r}
+
+ bd_rf_unc=break_down_uncertainty(explainer_rf, johnny, B = 10)
+  
+```
+
+```{r}
+
+plot(bd_rf_unc)
+
+```
+
+  Conclusions:
+  
+    1. empl, euribor, pdays,..  definietly positive influence
+    2. marital & poutcome rather negative
+
+  
+Shapley values plot
+  
+```{r}
+
+ shap_johny <- shap(explainer_rf, johnny, B = 10)
+ plot(shap_johny) 
+ 
+```
+
+  Conclusions:
+
+      1. On avarage emp, euribor,pdays, .. are positive 
+
+
+Lime like explanation plots 
+  
+```{r message=FALSE, warning=FALSE}
+
+  lime_rf <- lime::lime(test[,colnames(johnny)], RF)
+  lime_expl <- lime::explain(johnny, lime_rf, labels ="yes", n_features = 6, n_permutations = 100)
+  lime_expl
+  
+  johnny$class
+  
+  #explain():
+  #n_features - how many features we want to look at
+  #n_labels - how many classes we want to explain 
+  
+  #how do we want to choose these features?
+  #The class, auto, uses forward selection if we chose n_features <= 6 
+  #and uses the features with highest weights otherwise. 
+  #We can also directly choose feature_select = "forward_selection",
+  #feature_select = "highest_weights" or feature_select = "lasso_path". 
+```
+
+
+```{r}
+ plot_features(lime_expl)
+```
+
+Conclusions:
+  
+    1. all positive
+    2. Different variable - contact
+    3. White box fit to Black box fit to the Phenomenon
+
+
+
+ 
+
+  
+
+

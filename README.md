@@ -12,7 +12,8 @@ The purpose of the course is to familiarize students with the principles and app
 - Capstone project and presentation: 70%
 
   
-## Labs schedule and topics
+## Labs schedule
+The course will explore the implementation of XAI from the perspective of different modelling problems - classification, regression and, additionally, deep learning within the scope of image data processing. 
 
 | Lab |    Date    |     Coordinator   |       Topic    |
 |-----|------------|-------------------|----------------|

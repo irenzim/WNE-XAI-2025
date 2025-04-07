@@ -16,7 +16,7 @@ This repository contains codes for the second milestone of the Course, namely le
 
 ## 🔧 Setup Instructions
 
-Assuming that you have already cloned the repository:
+Assuming that you have already cloned the repository and are currently in WNE-XAI-2025/ folder:
 
 1. Make sure you are in project folder `03_regression`:
 ```bash 
@@ -25,7 +25,7 @@ cd 03_regression
 
 2. Create a new conda environment: 
 ```bash 
-conda env create --name xai-env python=3.9
+conda create -n xai-env python=3.9
 ```
 
 3. Activate the environment: 

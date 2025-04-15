@@ -11,4 +11,5 @@ geopandas
 pydeck
 nbformat
 dtreeviz
+mljar-supervised
 ipykernel

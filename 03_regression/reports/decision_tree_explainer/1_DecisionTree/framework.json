@@ -1,0 +1,115 @@
+{
+    "uid": "b5663f75-9d6f-4fbe-9da8-c55d74542f66",
+    "name": "1_DecisionTree",
+    "preprocessing": [
+        {
+            "categorical": [
+                {
+                    "convert_method": "categorical_to_int",
+                    "convert_params": {
+                        "district_name": {
+                            "Bellevue": 0,
+                            "Federal Way": 1,
+                            "Kent": 2,
+                            "King County": 3,
+                            "Kirkland": 4,
+                            "Mercer Island": 5,
+                            "Renton": 6,
+                            "Sammamish": 7,
+                            "Seattle": 8,
+                            "Shoreline": 9
+                        }
+                    },
+                    "columns": [
+                        "district_name"
+                    ]
+                }
+            ],
+            "ml_task": "regression",
+            "params": {
+                "columns_preprocessing": {
+                    "district_name": [
+                        "categorical_to_int"
+                    ]
+                },
+                "target_preprocessing": [
+                    "na_exclude"
+                ],
+                "ml_task": "regression"
+            }
+        }
+    ],
+    "learners": [
+        {
+            "library_version": "1.6.1",
+            "algorithm_name": "Decision Tree",
+            "algorithm_short_name": "Decision Tree",
+            "uid": "c3a8107d-d88d-4c2f-8bdf-13103d3e778f",
+            "params": {
+                "model_type": "Decision Tree",
+                "ml_task": "regression",
+                "n_jobs": -1,
+                "seed": 1235,
+                "criterion": "squared_error",
+                "max_depth": 3,
+                "explain_level": 2
+            },
+            "name": "learner_fold_0"
+        }
+    ],
+    "params": {
+        "additional": {
+            "trees_in_step": 1,
+            "train_cant_improve_limit": 0,
+            "max_steps": 1,
+            "max_rows_limit": null,
+            "max_cols_limit": null
+        },
+        "preprocessing": {
+            "columns_preprocessing": {
+                "district_name": [
+                    "categorical_to_int"
+                ]
+            },
+            "target_preprocessing": [
+                "na_exclude"
+            ],
+            "ml_task": "regression"
+        },
+        "validation_strategy": {
+            "validation_type": "split",
+            "train_ratio": 0.75,
+            "shuffle": true,
+            "X_path": "../reports/decision_tree_explainer/X.data",
+            "y_path": "../reports/decision_tree_explainer/y.data",
+            "results_path": "../reports/decision_tree_explainer"
+        },
+        "learner": {
+            "model_type": "Decision Tree",
+            "ml_task": "regression",
+            "n_jobs": -1,
+            "seed": 1235,
+            "criterion": "squared_error",
+            "max_depth": 3,
+            "explain_level": 2
+        },
+        "automl_random_state": 1234,
+        "ml_task": "regression",
+        "explain_level": 2,
+        "name": "1_DecisionTree",
+        "status": "initialized",
+        "final_loss": null,
+        "train_time": null,
+        "data_type": "original",
+        "max_time_for_learner": 360.0
+    },
+    "saved": [
+        "1_DecisionTree/learner_fold_0.decision_tree"
+    ],
+    "predictions_fname": "1_DecisionTree/predictions_validation.csv",
+    "metric_name": "rmse",
+    "final_loss": "0.3578351317983037",
+    "train_time": 5.729663848876953,
+    "is_stacked": false,
+    "joblib_version": "1.4.2"
+}

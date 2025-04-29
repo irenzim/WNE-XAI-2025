@@ -1,0 +1,76 @@
+{
+    "columns": [
+        "bathrooms",
+        "bedrooms",
+        "floors",
+        "waterfront",
+        "view",
+        "condition",
+        "grade",
+        "dist_stop",
+        "ncult",
+        "age",
+        "m2_living",
+        "m2_lot",
+        "m2_living15",
+        "m2_lot15",
+        "district_name",
+        "m2_ratio"
+    ],
+    "rows": 15005,
+    "cols": 16,
+    "target_is_numeric": true,
+    "columns_info": {
+        "bathrooms": [
+            "scale"
+        ],
+        "bedrooms": [
+            "scale"
+        ],
+        "floors": [
+            "scale"
+        ],
+        "waterfront": [],
+        "view": [],
+        "condition": [
+            "scale"
+        ],
+        "grade": [
+            "scale"
+        ],
+        "dist_stop": [
+            "scale"
+        ],
+        "ncult": [
+            "scale"
+        ],
+        "age": [
+            "scale"
+        ],
+        "m2_living": [
+            "scale"
+        ],
+        "m2_lot": [
+            "scale"
+        ],
+        "m2_living15": [
+            "scale"
+        ],
+        "m2_lot15": [
+            "scale"
+        ],
+        "district_name": [
+            "categorical",
+            "few_categories"
+        ],
+        "m2_ratio": [
+            "scale"
+        ]
+    },
+    "target_info": [
+        "scale_log"
+    ],
+    "n_features": 16,
+    "is_sample_weighted": false,
+    "is_fairness_applied": false
+}

@@ -1,0 +1,17 @@
+feature,mean_importance
+bathrooms,0.0
+bedrooms,0.0
+floors,0.0
+waterfront,0.0
+view,0.0
+condition,0.0
+dist_stop,0.0
+ncult,0.0
+m2_lot,0.0
+m2_living15,0.0
+m2_lot15,0.0
+m2_ratio,0.0
+age,0.013971310674535647
+district_name,0.04163584757236094
+m2_living,0.07579879436797372
+grade,0.18178975241032053

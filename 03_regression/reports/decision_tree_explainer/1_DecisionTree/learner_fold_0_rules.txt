@@ -1,0 +1,16 @@
+if (grade <= 8.5) and (m2_living > 164.299) and (district_name <= 6.5) then response: 12.99 | based on 2,859 samples
+
+if (grade <= 8.5) and (m2_living <= 164.299) and (district_name <= 6.5) then response: 12.578 | based on 2,508 samples
+
+if (grade <= 8.5) and (m2_living <= 164.299) and (district_name > 6.5) then response: 12.923 | based on 2,251 samples
+
+if (grade > 8.5) and (m2_living <= 355.726) and (age <= 44.5) then response: 13.47 | based on 1,468 samples
+
+if (grade <= 8.5) and (m2_living > 164.299) and (district_name > 6.5) then response: 13.275 | based on 1,431 samples
+
+if (grade > 8.5) and (m2_living > 355.726) and (grade <= 10.5) then response: 13.954 | based on 291 samples
+
+if (grade > 8.5) and (m2_living <= 355.726) and (age > 44.5) then response: 13.897 | based on 260 samples
+
+if (grade > 8.5) and (m2_living > 355.726) and (grade > 10.5) then response: 14.335 | based on 185 samples
+

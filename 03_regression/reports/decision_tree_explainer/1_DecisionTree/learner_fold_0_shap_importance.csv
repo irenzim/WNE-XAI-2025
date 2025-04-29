@@ -1,0 +1,17 @@
+feature,shap_importance
+grade,0.23383606031151297
+m2_living,0.1522479552309013
+district_name,0.11926602321704556
+age,0.025338821115014995
+bathrooms,0.0
+bedrooms,0.0
+floors,0.0
+waterfront,0.0
+view,0.0
+condition,0.0
+dist_stop,0.0
+ncult,0.0
+m2_lot,0.0
+m2_living15,0.0
+m2_lot15,0.0
+m2_ratio,0.0

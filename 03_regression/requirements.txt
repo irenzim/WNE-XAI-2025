@@ -11,5 +11,10 @@ geopandas
 pydeck
 nbformat
 dtreeviz
-mljar-supervised
+# mljar-supervised
 ipykernel
+optuna 
+shap
+dalex
+alibi
+lime
